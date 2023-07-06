@@ -13,6 +13,8 @@ def train(model, train_loader, val_loader, num_epochs, criterion, optimizer, dev
 
     for epoch in range(num_epochs):
         running_loss = 0.0
+        total_dice = 0.0
+        num_samples = 0
 
         for images, targets in train_loader:
             images = images.to(device)
@@ -24,11 +26,16 @@ def train(model, train_loader, val_loader, num_epochs, criterion, optimizer, dev
             loss = criterion(outputs, targets)
             loss.backward()
             optimizer.step()
-
             running_loss += loss.item()
+            dice = dice_score(outputs, targets)
+            total_dice += dice * len(images)
+            num_samples += len(images)
 
         epoch_loss = running_loss / len(train_loader)
         print(f"Epoch [{epoch+1}/{num_epochs}], Training Loss: {epoch_loss:.4f}")
+        
+        # Evaluate on train set
+        print(f"Epoch [{epoch+1}/{num_epochs}], Train Dice Score: {total_dice/num_samples:.4f}")
 
         # Evaluate on validation set
         val_dice = evaluate(model, val_loader, device)
@@ -71,15 +78,16 @@ transforms = {
 }
 
 # Example usage
-model = UNet(3,2)  # Instantiate your model
-data_folder = ""
-train_dataset = CarvanaDataset(data_folder, transforms=transforms)
-val_dataset = CarvanaDataset(data_folder, mode='val', transforms=transforms)
+model = UNet(3,1)  # Instantiate your model
+data_folder = "/cache/fast_data_nas8/swetha"
+train_dataset = CarvanaDataset(data_folder, data_limit=100, transforms=transforms)
+val_dataset = CarvanaDataset(data_folder, mode='val', data_limit=100, transforms=transforms)
 train_loader = DataLoader(train_dataset, batch_size=2, shuffle=False)  # Create your train data loader
 val_loader = DataLoader(val_dataset, batch_size=2, shuffle=False)  # Create your validation data loader
 num_epochs = 10  # Specify the number of training epochs
 criterion = nn.CrossEntropyLoss()  # Define your loss function
 optimizer = optim.SGD(model.parameters(), lr=0.001, momentum=0.9)  # Define your optimizer
 device = torch.device("cuda" if torch.cuda.is_available() else "cpu")  # Choose your device
-
+print("train_dataset", len(train_dataset))
+print("val_dataset", len(val_dataset))
 train(model, train_loader, val_loader, num_epochs, criterion, optimizer, device)

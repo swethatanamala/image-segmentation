@@ -8,10 +8,12 @@ from torch.utils.data import Dataset
 
 class CarvanaDataset(Dataset):
     
-    def __init__(self, data_folder, mode="train", transforms=None):
+    def __init__(self, data_folder, mode="train", data_limit=None, transforms=None):
         self.transforms = transforms
         self.data_folder = data_folder
         self.all_images = glob(f"{data_folder}/train/*.jpg")
+        if data_limit:
+            self.all_images = self.all_images[:data_limit]
         self.mode = mode
         self.images, self.masks = self.select_mode_dataset()
         self.transforms = transforms
