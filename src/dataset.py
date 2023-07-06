@@ -44,7 +44,7 @@ class CarvanaDataset(Dataset):
         img = cv2.imread(img_path)
         mask_path = os.path.join(self.data_folder, "train_masks",
                                  f"{img_name}_mask.gif")
-        mask = np.array(Image.open(mask_path))
+        mask = np.array(Image.open(mask_path)) * 255
         if self.transforms:
             img, mask = self.transforms[self.mode](img), self.transforms[self.mode](mask)
         return img, mask

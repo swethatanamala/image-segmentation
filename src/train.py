@@ -69,11 +69,11 @@ transforms = {
         transforms.ToTensor(),
         transforms.RandomHorizontalFlip(p=0.5),
         transforms.RandomCrop((350, 350)),
-        transforms.Resize((512, 512))
+        transforms.Resize((512, 512), interpolation=0)
     ]),
     "val": transforms.Compose([
         transforms.ToTensor(),
-        transforms.Resize((512, 512))
+        transforms.Resize((512, 512), interpolation=0)
     ]) 
 }
 
