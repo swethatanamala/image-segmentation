@@ -4,10 +4,12 @@ import torch.optim as optim
 import os
 from metrics import dice_score
 from model import UNet
-from torchvision import transforms
+import segmentation_models_pytorch as smp
 from dataset import CarvanaDataset
+from torch.optim.lr_scheduler import StepLR
 from torch.utils.data import DataLoader
 from tqdm import tqdm
+import transforms as tsfms
 
 def main(model, train_loader, val_loader, num_epochs, criterion, optimizer, device):
     data_loaders = {"train": train_loader,
@@ -31,6 +33,7 @@ def run_epoch(model, data_loaders, mode, epoch, num_epochs, criterion, optimizer
         model.train()
     else:
         model.eval()
+    scheduler = StepLR(optimizer, step_size=20, gamma=0.1)
     for images, targets in data_loaders[mode]:
         images = images.to(device)
         targets = targets.to(device)
@@ -41,6 +44,7 @@ def run_epoch(model, data_loaders, mode, epoch, num_epochs, criterion, optimizer
             if mode == 'train':
                 loss.backward()
                 optimizer.step()
+                scheduler.step()
             running_loss += loss.item()
             dice = dice_score(outputs, targets)
             total_dice += dice * len(images)
@@ -53,29 +57,38 @@ def run_epoch(model, data_loaders, mode, epoch, num_epochs, criterion, optimizer
 
 
 transforms = {
-    "train": transforms.Compose([
-        transforms.ToTensor(),
-        #transforms.RandomHorizontalFlip(p=0.5),
-        #transforms.RandomCrop((350, 350)),
-        transforms.Resize((512, 512), interpolation=0)
+    "train": tsfms.Compose([
+        tsfms.RandomRotate(30),
+        tsfms.RandomSizedCrop(512, frac_range=[0.08, 1]),
+        tsfms.RandomHorizontalFlip(),
+        #tsfms.RandomIntensityJitter(0.1, 0.1),
+        tsfms.Resize((512, 512)),
+        tsfms.Clip(0, 255, 0, 1),
+        tsfms.ToTensor(),
     ]),
-    "val": transforms.Compose([
-        transforms.ToTensor(),
-        transforms.Resize((512, 512), interpolation=0)
-    ]) 
+    "val": tsfms.Compose([
+        tsfms.Resize((512, 512)),
+        tsfms.Clip(0, 255, 0, 1),
+        tsfms.ToTensor()
+    ])
 }
 
 # Example usage
-model = UNet(3,2)  # Instantiate your model
+#model = UNet(3,2)  # Instantiate your model
+model = smp.Unet(
+    encoder_name='resnet18',  # Choose the encoder backbone, e.g., 'resnet18', 'resnet34', 'resnet50'
+    encoder_weights='imagenet',  # Use ImageNet pretraining weights
+    in_channels=3,  # Number of input channels (e.g., 3 for RGB images)
+    classes=2  # Number of output classes (e.g., 2 for binary segmentation)
+)
+
 data_folder = "/cache/fast_data_nas8/swetha"
-train_dataset = CarvanaDataset(data_folder, data_limit=10, transforms=transforms)
-val_dataset = CarvanaDataset(data_folder, mode='val', data_limit=10, transforms=transforms)
+train_dataset = CarvanaDataset(data_folder, data_limit=100, transforms=transforms)
+val_dataset = CarvanaDataset(data_folder, mode='val', data_limit=100, transforms=transforms)
 train_loader = DataLoader(train_dataset, batch_size=2, shuffle=True)  # Create your train data loader
 val_loader = DataLoader(val_dataset, batch_size=2, shuffle=True)  # Create your validation data loader
 num_epochs = 100  # Specify the number of training epochs
 criterion = nn.CrossEntropyLoss()  # Define your loss function
-optimizer = optim.SGD(model.parameters(), lr=0.1, momentum=0.9)  # Define your optimizer
+optimizer = optim.SGD(model.parameters(), lr=0.05, momentum=0.9)  # Define your optimizer
 device = torch.device("cuda" if torch.cuda.is_available() else "cpu")  # Choose your device
-print("train_dataset", len(train_dataset))
-print("val_dataset", len(val_dataset))
 main(model, train_loader, val_loader, num_epochs, criterion, optimizer, device)
