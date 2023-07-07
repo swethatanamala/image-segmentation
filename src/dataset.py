@@ -47,6 +47,8 @@ class CarvanaDataset(Dataset):
         mask = np.array(Image.open(mask_path)) * 255
         if self.transforms:
             img, mask = self.transforms[self.mode](img), self.transforms[self.mode](mask)
+        
+        mask = np.int64(mask[0])
         return img, mask
 
 
